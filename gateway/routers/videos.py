@@ -133,7 +133,15 @@ async def _submit_video_job(job_id: str, req: dict):
             _store_job(job_id, {
                 "status": "completed",
                 "progress": "1.0",
-                "result_url": result.get("video_url", ""),
+                # video worker 返回相对路径（/video/{id}.mp4，挂在 worker 端口上），
+                # 拼成绝对地址，否则调用方拿到后无法下载
+                "result_url": _absolute_video_url(result.get("video_url", "")),
             })
     except Exception as e:
         _store_job(job_id, {"status": "failed", "error": str(e)})
+
+
+def _absolute_video_url(video_url: str) -> str:
+    if video_url and video_url.startswith("/"):
+        return f"{settings.VIDEO_WORKER_URL}{video_url}"
+    return video_url
