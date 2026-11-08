@@ -1,0 +1,96 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  sdcpp:
+    build:
+      context: ../workers/sdcpp
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ${MODEL_DIR:-/root/.local-ai-models}/sd:/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      - MODELS_PATH=/models
+
+  kokoro:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.kokoro
+    ports:
+      - "8880:8880"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  asr:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.asr
+    ports:
+      - "8881:8881"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  video-worker:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.video
+    ports:
+      - "8001:8001"
+    volumes:
+      - ${MODEL_DIR:-/root/.local-ai-models}/video:/models/video
+      - /tmp/video_output:/tmp/video_output
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
+      - SDCPP_URL=http://sdcpp:8080
+      - KOKORO_URL=http://kokoro:8880
+      - ASR_URL=http://asr:8881
+      - VIDEO_WORKER_URL=http://video-worker:8001
+      - REDIS_URL=redis://redis:6379/0
+      - API_KEY=${API_KEY:-local-ai-gateway-secret-key}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - redis
+      - sdcpp
+      - kokoro
+      - asr
+      - video-worker
+
+volumes:
+  redis_data:
