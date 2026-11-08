@@ -24,7 +24,9 @@ async def chat_completions(request: Request):
     if body.get("model") in MODEL_MAP:
         body["model"] = MODEL_MAP[body["model"]]
 
-    async with httpx.AsyncClient(timeout=120) as client:
+    # 本地大模型（如 27B 混合卸载）长文本生成可能超过 2 分钟，
+    # 120s 会把正常的慢生成掐断成 500，放宽到 10 分钟
+    async with httpx.AsyncClient(timeout=600) as client:
         resp = await client.post(
             f"{settings.OLLAMA_BASE_URL}/chat/completions",
             json=body,
