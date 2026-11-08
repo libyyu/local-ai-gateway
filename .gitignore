@@ -3,3 +3,4 @@
 venv
 logs
 *.pyc
+workers/sdcpp/stable-diffusion.cpp
